@@ -1,19 +1,19 @@
 #!/usr/bin/python3
-import os
 import copy
-import csv
 import pandas as pd
-from math import log2, fsum
+from numpy import log2
+import numpy as np 
 from sklearn import metrics
+import argparse
 INF = 99999
 
 class Node:
-	def __init__(self, parent, pk, nk, nodeType, attributeName=None, attributeIndex=-1, classification=None):
+	def __init__(self, parent, posLabel, negLabel, type, attributeName=None, attributeIndex=-1, classification=None):
 		self.parent = parent
-		self.p = pk
-		self.n = nk
-		self.type = nodeType
-		if(self.type == 'test'):
+		self.posLabel = posLabel
+		self.negLabel = negLabel
+		self.type = type
+		if(self.type == 'nonLeaf'):
 			self.attributeName = attributeName
 			self.attributeIndex = attributeIndex
 		else:
@@ -22,70 +22,60 @@ class Node:
 
 
 class DecisionTree:
-	def __init__(self, attributes, examples):
+	def __init__(self, attributes, df):
 		self.attributes = attributes
-		self.examples = examples
+		self.df = df.values
 
 		values = {}
 		for index, a in enumerate(attributes):
-			temp = []
-			for row in examples:
-				if(row[index] not in temp):
-					temp.append(row[index])
-			values[a] = temp
-
+			values[a] = df[a].unique().tolist()
 		self.attributeValues = values
 		self.classLabel = self.attributeValues[self.attributes[len(attributes) - 1]] #class label
 		self.pValue, self.nValue = self.classLabel[0], self.classLabel[1]
-		self.p, self.n = self.count(examples)
+		self.p, self.n = self.countClassLabel(df.values)
 		self.takenAttributes = []
 
-	def ID3(self, examples, attributes, parent, parentExamples):
-		if(len(examples) == 0):
-			return self.pluralityValue(parent, parentExamples)
-		elif(self.same_class(examples)):
-			p, n = self.count(examples)
-			return Node(parent, p, n, 'leaf', classification = self.pValue if p > 0 else self.nValue)
-		elif((len(attributes) - len(self.takenAttributes)) == 0):
-			return self.pluralityValue(parent, examples)
+	def ID3(self, df, attributes, parent, parentExamples):
+		if(len(df) == 0):
+			return self.predictNode(parent, parentExamples)
+		elif(self.same_class(df) or (len(attributes) - len(self.takenAttributes)) == 0):
+			return self.predictNode(parent, df)
 		else:
-			attrIndex = self.maxIG(attributes, examples)
+			attrIndex = self.find_winner(attributes, df)
 			attribute = attributes[attrIndex]
-			p, n = self.count(examples)
+			p, n = self.countClassLabel(df)
 			
-			root = Node(parent, p, n, 'test', attributeName = attribute, attributeIndex = attrIndex)
+			root = Node(parent, p, n, 'nonLeaf', attributeName = attribute, attributeIndex = attrIndex)
 			self.takenAttributes.append(attribute)
 
 			for value in self.attributeValues[attribute]:
 				newExample = []
-				for row in examples:
+				for row in df:
 					if(row[attrIndex] == value):
 						newExample.append(copy.deepcopy(row))
-				childNode = self.ID3(newExample, attributes, root, examples)
-
+				childNode = self.ID3(newExample, attributes, root, df)
 				root.branches[value] = childNode
 
 		return root
 
-	def same_class(self, examples,):
-		prevValue = examples[0][len(examples[0]) - 1]
-		for row in examples[1:]:
+	def same_class(self, df):
+		prevValue = df[0][len(df[0]) - 1]
+		for row in df[1:]:
 			if(row[len(row) - 1] != prevValue):
 				return False
 		return True
   
-	def entropy_s(self, q):
-		return q if q == 0.0 else -1 * (q * log2(q) + (((1 - q) * log2(1 - q)) if q < 1 else 0))
-	
-	def cal_entropy(self, counts):
-		return ((counts[2] + counts[3])/(counts[0] + counts[1])) * self.entropy_s((counts[2]/(counts[2] + counts[3])) if (counts[2] + counts[3] > 0) else 0)
+	def find_entropy(self, q):
+		if q == 0:
+			return 0
+		if q >= 1:
+			return -1 * (q * log2(q))
+		temp = 1-q
+		return -1 * (q * log2(q) + temp*log2(temp))
 
-	def remainder(self,subsets):
-		return fsum(map(self.cal_entropy, subsets))
-
-	def maxIG(self, attributes, examples):
+	def find_winner(self, attributes, examples):
 		maxVal = -INF
-		maxValInd = -1
+		maxValInd = -INF
 		
 		for index, a in enumerate(attributes[:len(attributes) - 1]):
 			if(a not in self.takenAttributes):
@@ -95,10 +85,8 @@ class DecisionTree:
 					maxValInd = index
 		return maxValInd
 
-
 	def IG(self, attribute, index, examples):
-		subsets = []
-
+		i_attr = 0
 		for value in self.attributeValues[attribute]:
 			pk = nk = 0
 			for row in examples:
@@ -107,26 +95,17 @@ class DecisionTree:
 						pk += 1
 					else:
 						nk += 1
+			
+			i_attr += ((pk + nk)/(self.p + self.n)) * self.find_entropy((pk/(pk + nk)) if (pk + nk > 0) else 0)
+		h = self.find_entropy(self.p/(self.p + self.n))
+		return h - i_attr	
 
-			subsets.append((self.p, self.n, pk, nk))
-		
-		return self.entropy_s(self.p/(self.p + self.n)) - self.remainder(subsets)		
-
-	def pluralityValue(self, parent, examples):
-		p, n = self.count(examples)
-	
+	def predictNode(self, parent, df):
+		p, n = self.countClassLabel(df)
 		return Node(parent, p, n, 'leaf', classification = self.pValue if p > n else self.nValue)
 
-	def count(self, examples):
-		p = n = 0
-
-		for row in examples:
-			if(row[len(row) - 1] == self.pValue):
-				p += 1
-			elif(row[len(row) - 1] == self.nValue):
-				n += 1
-
-		return p, n
+	def countClassLabel(self, examples):
+		return sum(list(x).count(self.pValue) for x in examples), sum(list(x).count(self.nValue) for x in examples)
 
 	def printDTree(self, node, value=None):
 		print(node.parent.attributeName + '=' if node.parent else '', value if value else '')
@@ -135,13 +114,9 @@ class DecisionTree:
 				print('|' + node.branches[branch].parent.attributeName, ' = ', branch if branch else '', ':', node.branches[branch].classification)
 
 		for branch in node.branches:
-			if(node.branches[branch].type == 'test'):
+			if(node.branches[branch].type == 'nonLeaf'):
 				self.printDTree(node.branches[branch], branch)
 
-
-#Cross validation: KFolds
-
-#predict data
 	def traverseTree(self, test, node):
 		attributeValue = test[node.attributeName]
 		if(node.branches[attributeValue].type == 'leaf'):
@@ -157,21 +132,7 @@ class DecisionTree:
 				test[self.attributes[index]] = data
 
 			predictions.append(self.traverseTree(test, self.root))
-
 		return predictions
-
-
-df = pd.read_csv('weather.csv')
-columnNames = list(df.columns)
-trainData = df.values
-decisionTree = DecisionTree(columnNames, trainData)
-
-decisionTree.root = decisionTree.ID3(trainData, columnNames, None, trainData)
-
-print('===Classifier model(full training set)===')
-decisionTree.printDTree(decisionTree.root)
-newdf = df[df.columns[0:len(df.columns)-1]]
-predictions = decisionTree.predict(newdf.values)
 
 #Cross validation:
 def crossValidation(df, n_split):
@@ -185,7 +146,7 @@ def crossValidation(df, n_split):
 		y = df[start:end]
 		X = df.drop(y.index)
 
-		decisionTree = DecisionTree(columnNames, X.values)
+		decisionTree = DecisionTree(columnNames, X)
 		decisionTree.root = decisionTree.ID3(X.values, columnNames, None, X.values)
 		X_test = y[y.columns[0:len(df.columns)-1]]
 		y_test = y.iloc[:,len(df.columns)-1].values
@@ -204,13 +165,42 @@ def accuracy_metric(actual, predicted):
 			correct += 1
 	return correct, correct / float(len(actual)) * 100.0
 
-predicted, y_test = crossValidation(df, 3)
+# main function
+parser=argparse.ArgumentParser()
+parser.add_argument('--input', help='Name of csv file')
+parser.add_argument('--output', help='output')
+parser.add_argument('--folds', help='folds')
+
+args=parser.parse_args()
+input = args.input
+output = args.output
+folds = int(args.folds)
+
+wf = open(output,"w")
+df = pd.read_csv(input)
+columnNames = list(df.columns)
+trainData = df.values
+
+decisionTree = DecisionTree(columnNames, df)
+
+decisionTree.root = decisionTree.ID3(trainData, columnNames, None, trainData)
+
+print('===Classifier model(full training set)===')
+wf.write('===Classifier model(full training set)===')
+decisionTree.printDTree(decisionTree.root)
+newdf = df[df.columns[0:len(df.columns)-1]]
+predictions = decisionTree.predict(newdf.values)
+
+predicted, y_test = crossValidation(df, folds)
 correct_label, percent = accuracy_metric(y_test, predicted)
 
 print("Correctly Classified Instances", correct_label, str(percent) + '%')
+wf.write("Correctly Classified Instances"+ correct_label+ percent + '%')
 print("Incorrectly Classified Instances", str(len(y_test)- correct_label), str(100-percent) + '%')
+wf.write("Incorrectly Classified Instances"+ str(len(y_test)- correct_label)+ (100-percent) + '%')
 
 print("===Detailed Accuracy By Class===")
+wf.write("===Detailed Accuracy By Class===")
 
 confusion = metrics.confusion_matrix(y_test, predicted)
 TN, FP    = confusion[0, 0], confusion[0, 1]
@@ -222,5 +212,9 @@ fp_recall = TN/(TN+FP)
 tp_fmeasure = (2*tp_recall*tp_precision)/(tp_recall+tp_precision)
 fp_fmeasure = (2*fp_recall*fp_precision)/(fp_recall+fp_precision)
 print('Class', 'TP Rate', 'FP Rate', 'Precision', 'Recall', 'F-Measure')
+wf.write('Class'+ 'TP Rate'+ 'FP Rate'+ 'Precision'+ 'Recall'+ 'F-Measure')
 print('yes', TP, FP, tp_precision, tp_recall, tp_fmeasure)
 print('no', TN, FN, fp_precision, fp_recall, fp_fmeasure)
+wf.write('yes'+ TP+ FP+ tp_precision+ tp_recall+ tp_fmeasure)
+wf.write('no'+ TN+ FN+fp_precision+ fp_recall+ fp_fmeasure)
+wf.close()
