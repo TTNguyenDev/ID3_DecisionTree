@@ -1,0 +1,14 @@
+===Classifier model(full training set)===
+|outlook = overcast:yes
+outlook=sunny
+|humidity = high:no
+|humidity = normal:yes
+outlook=rainy
+|wind = weak:yes
+|wind = strong:no
+Correctly Classified Instances	9	     64.29%
+Incorrectly Classified Instances	5	     35.71%
+===Detailed Accuracy By Class===
+Class	TP Rate		FP Rate		Precision		Recall		F-Measure
+yes	      6.00	      2.00	      0.75	      0.67	      0.71
+no	      3.00	      3.00	      0.50	      0.60	      0.55

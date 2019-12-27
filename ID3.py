@@ -6,7 +6,6 @@ import numpy as np
 from sklearn import metrics
 import argparse
 INF = 99999
-
 class Node:
 	def __init__(self, parent, posLabel, negLabel, type, attributeName=None, attributeIndex=-1, classification=None):
 		self.parent = parent
@@ -109,10 +108,11 @@ class DecisionTree:
 
 	def printDTree(self, node, value=None):
 		print(node.parent.attributeName + '=' if node.parent else '', value if value else '')
+		
 		for branch in node.branches:
 			if(node.branches[branch].type == 'leaf'):
 				print('|' + node.branches[branch].parent.attributeName, ' = ', branch if branch else '', ':', node.branches[branch].classification)
-
+				
 		for branch in node.branches:
 			if(node.branches[branch].type == 'nonLeaf'):
 				self.printDTree(node.branches[branch], branch)
@@ -158,6 +158,23 @@ def crossValidation(df, n_split):
 
 	return predicted_arr, expected_arr
 
+def drawID3(node, value, wf):
+		print(node.parent.attributeName + '=' if node.parent else '', value if value else '')
+		if (node.parent):
+			wf.write(node.parent.attributeName + '=')
+		if (value):
+			wf.write(value+'\n')
+		for index, branch in enumerate(node.branches):
+			if(node.branches[branch].type == 'leaf'):
+				print('|' + node.branches[branch].parent.attributeName, ' = ', branch if branch else '', ':', node.branches[branch].classification)
+				wf.write('|' + node.branches[branch].parent.attributeName + ' = ')
+				if (branch):
+					wf.write(branch)
+				wf.write(':' + node.branches[branch].classification + '\n')
+		for branch in node.branches:
+			if(node.branches[branch].type == 'nonLeaf'):
+				drawID3(node.branches[branch], branch, wf)
+
 def accuracy_metric(actual, predicted):
 	correct = 0
 	for i in range(len(actual)):
@@ -176,31 +193,31 @@ input = args.input
 output = args.output
 folds = int(args.folds)
 
-wf = open(output,"w")
 df = pd.read_csv(input)
+wf = open(output,"w")
 columnNames = list(df.columns)
 trainData = df.values
 
 decisionTree = DecisionTree(columnNames, df)
-
 decisionTree.root = decisionTree.ID3(trainData, columnNames, None, trainData)
 
 print('===Classifier model(full training set)===')
-wf.write('===Classifier model(full training set)===')
-decisionTree.printDTree(decisionTree.root)
+wf.write('===Classifier model(full training set)===\n')
+drawID3(decisionTree.root, None, wf)
+
 newdf = df[df.columns[0:len(df.columns)-1]]
 predictions = decisionTree.predict(newdf.values)
 
 predicted, y_test = crossValidation(df, folds)
 correct_label, percent = accuracy_metric(y_test, predicted)
 
-print("Correctly Classified Instances", correct_label, str(percent) + '%')
-wf.write("Correctly Classified Instances"+ correct_label+ percent + '%')
-print("Incorrectly Classified Instances", str(len(y_test)- correct_label), str(100-percent) + '%')
-wf.write("Incorrectly Classified Instances"+ str(len(y_test)- correct_label)+ (100-percent) + '%')
+print("Correctly Classified Instances", correct_label, '{:10.2f}'.format(percent) + '%')
+print("Incorrectly Classified Instances", str(len(y_test)- correct_label), '{:10.2f}'.format(100-percent) + '%')
+wf.write("Correctly Classified Instances\t" + str(correct_label) + '\t' + '{:10.2f}'.format(percent) + '%\n')
+wf.write("Incorrectly Classified Instances\t"+ str(len(y_test)- correct_label) + '\t' + '{:10.2f}'.format(100-percent) + '%\n')
 
 print("===Detailed Accuracy By Class===")
-wf.write("===Detailed Accuracy By Class===")
+wf.write("===Detailed Accuracy By Class===\n")
 
 confusion = metrics.confusion_matrix(y_test, predicted)
 TN, FP    = confusion[0, 0], confusion[0, 1]
@@ -212,9 +229,9 @@ fp_recall = TN/(TN+FP)
 tp_fmeasure = (2*tp_recall*tp_precision)/(tp_recall+tp_precision)
 fp_fmeasure = (2*fp_recall*fp_precision)/(fp_recall+fp_precision)
 print('Class', 'TP Rate', 'FP Rate', 'Precision', 'Recall', 'F-Measure')
-wf.write('Class'+ 'TP Rate'+ 'FP Rate'+ 'Precision'+ 'Recall'+ 'F-Measure')
+wf.write('Class\t'+ 'TP Rate\t\t'+ 'FP Rate\t\t'+ 'Precision\t\t'+ 'Recall\t\t'+ 'F-Measure\n')
 print('yes', TP, FP, tp_precision, tp_recall, tp_fmeasure)
 print('no', TN, FN, fp_precision, fp_recall, fp_fmeasure)
-wf.write('yes'+ TP+ FP+ tp_precision+ tp_recall+ tp_fmeasure)
-wf.write('no'+ TN+ FN+fp_precision+ fp_recall+ fp_fmeasure)
+wf.write('yes\t' + '{:10.2f}'.format(TP) +'\t'+ '{:10.2f}'.format(FP)+'\t'+ '{:10.2f}'.format(tp_precision) +'\t' + '{:10.2f}'.format(tp_recall)+'\t'+ '{:10.2f}'.format(tp_fmeasure)+'\n')
+wf.write('no\t' + '{:10.2f}'.format(TN) +'\t'+ '{:10.2f}'.format(FN)+'\t'+ '{:10.2f}'.format(fp_precision) +'\t' + '{:10.2f}'.format(fp_recall)+'\t'+ '{:10.2f}'.format(fp_fmeasure)+'\n')
 wf.close()
