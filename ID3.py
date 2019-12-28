@@ -74,7 +74,7 @@ class DecisionTree:
 
 	def find_winner(self, attributes, examples):
 		maxVal = -INF
-		maxValInd = -INF
+		maxValInd = -1
 		
 		for index, a in enumerate(attributes[:len(attributes) - 1]):
 			if(a not in self.takenAttributes):
@@ -123,6 +123,7 @@ class DecisionTree:
 			return node.branches[attributeValue].classification
 		else:
 			return self.traverseTree(test, node.branches[attributeValue])
+		
 
 	def predict(self, testSet):
 		predictions = []
@@ -139,13 +140,17 @@ def crossValidation(df, n_split):
 	size = len(df)/n_split
 	predicted_arr = []
 	expected_arr = []
+
 	for i in range(0, len(df), int(size)):
 		start = i
 		end = i + int(size)
-	
+		print(start, end)
 		y = df[start:end]
 		X = df.drop(y.index)
 
+		print(y)
+		print(X)
+		columnNames = df.columns
 		decisionTree = DecisionTree(columnNames, X)
 		decisionTree.root = decisionTree.ID3(X.values, columnNames, None, X.values)
 		X_test = y[y.columns[0:len(df.columns)-1]]
@@ -205,9 +210,7 @@ print('===Classifier model(full training set)===')
 wf.write('===Classifier model(full training set)===\n')
 drawID3(decisionTree.root, None, wf)
 
-newdf = df[df.columns[0:len(df.columns)-1]]
-predictions = decisionTree.predict(newdf.values)
-
+print(folds)
 predicted, y_test = crossValidation(df, folds)
 correct_label, percent = accuracy_metric(y_test, predicted)
 
@@ -235,3 +238,4 @@ print('no', TN, FN, fp_precision, fp_recall, fp_fmeasure)
 wf.write('yes\t' + '{:10.2f}'.format(TP) +'\t'+ '{:10.2f}'.format(FP)+'\t'+ '{:10.2f}'.format(tp_precision) +'\t' + '{:10.2f}'.format(tp_recall)+'\t'+ '{:10.2f}'.format(tp_fmeasure)+'\n')
 wf.write('no\t' + '{:10.2f}'.format(TN) +'\t'+ '{:10.2f}'.format(FN)+'\t'+ '{:10.2f}'.format(fp_precision) +'\t' + '{:10.2f}'.format(fp_recall)+'\t'+ '{:10.2f}'.format(fp_fmeasure)+'\n')
 wf.close()
+

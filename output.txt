@@ -1,14 +1,19 @@
 ===Classifier model(full training set)===
-|outlook = overcast:yes
-outlook=sunny
-|humidity = high:no
-|humidity = normal:yes
-outlook=rainy
-|wind = weak:yes
-|wind = strong:no
-Correctly Classified Instances	9	     64.29%
-Incorrectly Classified Instances	5	     35.71%
+|parent = yes:cinema
+parent=no
+|money = poor:cinema
+money=rich
+|weather = windy:tenis
+|weather = rainy:tenis
+weather=sunny
+|decision = cinema:tenis
+|decision = tenis:tenis
+|decision = stayin:tenis
+|decision = shopping:tenis
+|decision = tennis:tenis
+Correctly Classified Instances	4	     40.00%
+Incorrectly Classified Instances	6	     60.00%
 ===Detailed Accuracy By Class===
 Class	TP Rate		FP Rate		Precision		Recall		F-Measure
-yes	      6.00	      2.00	      0.75	      0.67	      0.71
-no	      3.00	      3.00	      0.50	      0.60	      0.55
+yes	      0.00	      0.00	       nan	      0.00	       nan
+no	      4.00	      1.00	      0.80	      1.00	      0.89
